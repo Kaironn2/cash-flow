@@ -3,6 +3,7 @@ from django.db.models import Q
 from django.contrib.auth.models import User
 from finances.models import Expense, RecurringExpense
 
+
 def execute(user: User, year: int, month: int):
     concrete_expenses = list(Expense.objects.filter(
         user=user,

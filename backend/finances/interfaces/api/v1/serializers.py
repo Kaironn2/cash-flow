@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from finances.models import Expense, Category
+from finances.models import Category, Expense, InstallmentExpense, RecurringExpense
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -21,7 +21,7 @@ class ExpenseSerializer(serializers.ModelSerializer):
             'due_date',
             'paid',
             'category',
-            'is_installment',
+            'installment_origin',
         ]
 
     def to_representation(self, instance):
@@ -35,3 +35,51 @@ class ExpenseSerializer(serializers.ModelSerializer):
         ret['is_installment'] = instance.installment_origin_id is not None
             
         return ret
+
+
+class InstallmentExpenseCreateSerializer(serializers.ModelSerializer):
+    category_id = serializers.IntegerField(write_only=True)
+    
+    class Meta:
+        model = InstallmentExpense
+        fields = [
+            'name',
+            'total_amount',
+            'installments_quantity',
+            'first_due_date',
+            'category_id'
+        ]
+
+
+class ExpenseCreateSerializer(serializers.ModelSerializer):
+    category_id = serializers.IntegerField(
+        write_only=True, required=False, allow_null=True
+    )
+
+    class Meta:
+        model = Expense
+        fields = [
+            'name',
+            'amount',
+            'due_date',
+            'paid',
+            'category_id',
+        ]
+
+
+class RecurringExpenseSerializer(serializers.ModelSerializer):
+    category_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+
+    class Meta:
+        model = RecurringExpense
+        fields = [
+            'id',
+            'name',
+            'amount',
+            'due_day',
+            'start_date',
+            'end_date',
+            'active',
+            'category_id',
+        ]
+        read_only_fields = ['id', 'active']
