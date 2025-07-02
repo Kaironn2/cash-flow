@@ -38,7 +38,7 @@ class ExpenseViewSet(
             month = int(month_str)
         except (ValueError, TypeError):
             raise ValidationError({
-                'error': 'Os parâmetros "year" e "month" devem ser números inteiros.'
+                'error': 'The "year" and "month" parameters must be integers.'
             })
         
         queryset = list_expenses_by_month.execute(
