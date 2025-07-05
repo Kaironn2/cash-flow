@@ -4,6 +4,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Link from 'next/link';
+import axios from 'axios';
+import { useRouter } from 'next/navigation';
+import { endpoints } from '@/lib/api';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -34,10 +37,22 @@ export function RegisterForm() {
     defaultValues: { username: '', email: '', password: '', password2: '' },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    const { password2, ...dataToSend } = values;
-    console.log('Dados para registro:', dataToSend);
-    // TODO: call authService.register(dataToSend);
+  const router = useRouter()
+
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    try {
+      await axios.post(endpoints.register, values)
+      router.push('/login')
+    } catch (error: any) {
+      const errors = error.response?.data
+      if (errors) {
+        Object.entries(errors).forEach(([field, messages]) => {
+          form.setError(field as keyof typeof values, {
+            message: (messages as string[])[0],
+          })
+        })
+      } 
+    }
   }
 
   return (

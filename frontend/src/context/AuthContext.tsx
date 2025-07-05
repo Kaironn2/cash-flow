@@ -3,14 +3,15 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
-import { API } from '@/lib/api';
-
+import { endpoints } from '@/lib/api';
 
 interface AuthContextType {
   user: string | null;
+  accessToken: string | null;
   login: (username: string, password: string, rememberMe?: boolean) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
+  isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -18,6 +19,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -28,11 +30,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setAccessToken(storedToken);
       setUser(storedUser);
     }
+
+    setIsLoading(false);
   }, []);
 
   async function login(username: string, password: string, rememberMe = false) {
     try {
-      const response = await axios.post(API.login, {
+      const response = await axios.post(endpoints.login, {
         username,
         password,
       });
@@ -65,7 +69,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!accessToken }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        accessToken,
+        login,
+        logout,
+        isAuthenticated: !!accessToken,
+        isLoading,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

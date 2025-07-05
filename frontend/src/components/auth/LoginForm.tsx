@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '../ui/checkbox';
+import { useAuth } from '@/context/AuthContext';
 
 const formSchema = z.object({
   username: z.string().min(1, { message: 'O nome de usuário é obrigatório.' }),
@@ -24,6 +25,8 @@ const formSchema = z.object({
 });
 
 export function LoginForm() {
+  const { login } = useAuth()
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -33,9 +36,13 @@ export function LoginForm() {
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log('Dados de Login Validados:', values);
-    // TODO: call authService.login(values.username, values.password)
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    try {
+      await login(values.username, values.password, values.rememberMe)
+    } catch (error) {
+      form.setError('username', {message: 'Usuário ou senha inválidos'}),
+      form.setError('password', {message: 'Usuário ou senha inválidos'})
+    }
   }
 
   return (

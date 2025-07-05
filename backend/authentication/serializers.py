@@ -13,15 +13,30 @@ class UserCreateSerializer(serializers.ModelSerializer):
             'password': {'write_only': True}
         }
 
+    def validate_email(self, value):
+        if not value:
+            raise serializers.ValidationError('E-mail é um campo obrigatório.')
+        if User.objects.filter(email=value):
+            raise serializers.ValidationError('Esse e-mail já está em uso.')
+        return value
+    
+    def validate_username(self, value):
+        if not value:
+            raise serializers.ValidationError('Usuário é um campo obrigatório.')
+        if User.objects.filter(username=value):
+            raise serializers.ValidationError('Esse nome de usuário já está em uso.')
+        return value
+
     def validate(self, attrs):
         if attrs['password'] != attrs['password2']:
-            raise serializers.ValidationError({'password': 'Passwords do not match.'})
+            raise serializers.ValidationError({'password': 'Senhas divergentes.'})
         
         validate_password(attrs['password'])
         
         return attrs
 
     def create(self, validated_data):
+        validated_data.pop('password2')
         user = User.objects.create(
             username=validated_data['username'],
             email=validated_data['email']
