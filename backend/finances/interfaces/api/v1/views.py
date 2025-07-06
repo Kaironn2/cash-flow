@@ -4,9 +4,10 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from finances.services import create_installment_expense
+from finances.services.category_service import CategoryService
 from finances.services.expense_list_service import ExpenseListService
 from finances.services.expense_payment_service import ExpensePaymentService
-from finances.models import Category, PaidRecurringExpense, Expense, InstallmentExpense
+from finances.models import PaidRecurringExpense, Expense, InstallmentExpense
 from .serializers import (
     CategorySerializer,
     ExpenseSerializer,
@@ -53,16 +54,8 @@ class ExpenseViewSet(
         return ExpenseSerializer
 
     def perform_create(self, serializer):
-        category = None
         category_id = serializer.validated_data.pop('category_id', None)
-        if category_id:
-            try:
-                category = Category.objects.get(id=category_id, user=self.request.user)
-            except Category.DoesNotExist:
-                raise serializers.ValidationError(
-                    {'category_id': 'Category not found.'}
-                )
-
+        category = CategoryService(self.request.user, category_id).get_category_or_none()
         serializer.save(user=self.request.user, category=category)
 
     @action(detail=False, methods=['post'], url_path='mark-paid')
@@ -144,16 +137,8 @@ class RecurringExpenseViewSet(viewsets.ModelViewSet):
         return self.request.user.recurring_expenses.all().order_by('name')
 
     def perform_create(self, serializer):
-        category = None
         category_id = serializer.validated_data.pop('category_id', None)
-        if category_id:
-            try:
-                category = Category.objects.get(id=category_id, user=self.request.user)
-            except Category.DoesNotExist:
-                raise serializers.ValidationError(
-                    {'category_id': 'Category not found.'}
-                )
-
+        category = CategoryService(self.request.user, category_id).get_category_or_none()
         serializer.save(user=self.request.user, category=category)
 
     @action(detail=True, methods=['post'])
