@@ -7,6 +7,7 @@ export const endpoints = {
     expenses: `${API_URL}/finances/expenses/`,
     recurring: `${API_URL}/finances/recurring-expenses/`,
     installments: `${API_URL}/finances/installment-expenses/`,
+    expenseMonths: `${API_URL}/finances/expenses/months/`,
 };
 
 export const authHeader = (token: string) => ({

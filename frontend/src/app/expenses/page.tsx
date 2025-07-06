@@ -10,28 +10,63 @@ import { ExpenseModal } from '@/components/expenses/ExpenseModal';
 export default function ExpensesPage() {
   const { accessToken } = useAuth();
   const [expenses, setExpenses] = useState<any[]>([]);
+  const [availableMonths, setAvailableMonths] = useState<
+    { month: number; year: number }[]
+  >([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const today = new Date();
+
+  const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+
+  const monthNames = [
+    'Jan',
+    'Fev',
+    'Mar',
+    'Abr',
+    'Mai',
+    'Jun',
+    'Jul',
+    'Ago',
+    'Set',
+    'Out',
+    'Nov',
+    'Dez',
+  ];
 
   useEffect(() => {
     if (!accessToken) return;
 
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth() + 1;
+    axios
+      .get(endpoints.expenseMonths, {
+        headers: authHeader(accessToken),
+      })
+      .then((res) => {
+        setAvailableMonths(res.data);
+        if (res.data.length > 0) {
+          setSelectedYear(res.data[0].year);
+          setSelectedMonth(res.data[0].month);
+        }
+      })
+      .catch((err) => console.error(err));
+  }, [accessToken]);
+
+  useEffect(() => {
+    if (!accessToken) return;
 
     axios
-      .get(`${endpoints.expenses}?year=${year}&month=${month}`, {
+      .get(`${endpoints.expenses}?year=${selectedYear}&month=${selectedMonth}`, {
         headers: authHeader(accessToken),
       })
       .then((res) => setExpenses(res.data))
       .catch((err) => console.error(err));
-  }, [accessToken]);
+  }, [accessToken, selectedYear, selectedMonth]);
 
   const handleCreateExpense = async (data: any) => {
     if (!accessToken) return;
 
     let url = endpoints.expenses;
-
     if (data.type === 'installment') url = endpoints.installments;
     else if (data.type === 'recurring') url = endpoints.recurring;
 
@@ -39,22 +74,67 @@ export default function ExpensesPage() {
       await axios.post(url, data, {
         headers: authHeader(accessToken),
       });
-      const today = new Date();
-      const year = today.getFullYear();
-      const month = today.getMonth() + 1;
 
-      const res = await axios.get(`${endpoints.expenses}?year=${year}&month=${month}`, {
-        headers: authHeader(accessToken),
-      });
+      const res = await axios.get(
+        `${endpoints.expenses}?year=${selectedYear}&month=${selectedMonth}`,
+        {
+          headers: authHeader(accessToken),
+        },
+      );
       setExpenses(res.data);
     } catch (err) {
       console.error('Erro ao criar despesa:', err);
     }
   };
 
+  const years = Array.from(new Set(availableMonths.map((m) => m.year))).sort(
+    (a, b) => b - a,
+  );
+
+  function onYearChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const year = parseInt(e.target.value);
+    setSelectedYear(year);
+    const monthsOfYear = availableMonths
+      .filter((m) => m.year === year)
+      .map((m) => m.month);
+    if (monthsOfYear.length > 0) setSelectedMonth(monthsOfYear[0]);
+  }
+
+  function onMonthChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    setSelectedMonth(parseInt(e.target.value));
+  }
+
   return (
     <div className="p-6">
-      <div className="flex justify-end mb-6">
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex gap-4">
+          <select
+            value={selectedMonth}
+            onChange={onMonthChange}
+            className="p-2 rounded bg-[#2a2a2a] text-white"
+          >
+            {availableMonths
+              .filter((m) => m.year === selectedYear)
+              .map((m) => (
+                <option key={m.month} value={m.month}>
+                  {monthNames[m.month - 1]}
+                </option>
+              ))}
+          </select>
+
+          <select
+            value={selectedYear}
+            onChange={onYearChange}
+            className="p-2 rounded bg-[#2a2a2a] text-white"
+          >
+            {years.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <button
           onClick={() => setIsModalOpen(true)}
           className="bg-yellow-500 text-gray-900 font-semibold px-4 py-2 rounded hover:bg-yellow-400"
