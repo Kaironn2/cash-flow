@@ -14,50 +14,16 @@ class ExpenseListService:
         self.user = user
 
     def for_month(self, year: int, month: int) -> List[Expense]:
-        if not (1 <= month <= 12):
-            raise ValueError('Mês deve estar entre 1 e 12.')
-        if year < 1:
-            raise ValueError('Ano inválido.')
-
-        first_day = datetime.date(year, month, 1)
-
+        FinancesValidations.validate_month_year(year, month)
         concrete = list(
             Expense.objects.filter(
                 user=self.user, due_date__year=year, due_date__month=month
             )
         )
-
-        recurring_rules = RecurringExpense.objects.filter(
-            user=self.user,
-            active=True,
-            start_date__lte=datetime.date(year, month, calendar.monthrange(year, month)[1]),
-        ).filter(Q(end_date__gte=first_day) | Q(end_date__isnull=True))
-
-        paid_map = {
-            (p.recurring_expense_id, p.month, p.year): True
-            for p in PaidRecurringExpense.objects.filter(
-                user=self.user, month=month, year=year
-            )
-        }
-
-        virtual_expenses = []
-        for rule in recurring_rules:
-            due_date = FinancesValidations.safe_due_date(year, month, rule.due_day)
-
-            is_paid = paid_map.get((rule.id, month, year), False)
-
-            virtual_expense = Expense(
-                id=rule.id * -1,
-                user=self.user,
-                name=rule.name,
-                amount=rule.amount,
-                due_date=due_date,
-                category=rule.category,
-                paid=is_paid,
-            )
-            virtual_expenses.append(virtual_expense)
-
-        return sorted(concrete + virtual_expenses, key=lambda e: e.due_date)
+        rules = self._get_recurring_rules(year, month)
+        paid_map = self._get_paid_map(year, month)
+        virtual = self._generate_virtual_expenses(rules, paid_map, year, month)
+        return sorted(concrete + virtual, key=lambda e: e.due_date)
 
     def available_months(self) -> List[Dict[str, int]]:
         concrete = (
@@ -80,41 +46,42 @@ class ExpenseListService:
         ]
 
     def get_virtual_expenses(self, year: int, month: int) -> List[Expense]:
-        if not (1 <= month <= 12):
-            raise ValueError('Mês deve estar entre 1 e 12.')
-        if year < 1:
-            raise ValueError('Ano inválido.')
+        FinancesValidations.validate_month_year(year, month)
+        rules = self._get_recurring_rules(year, month)
+        paid_map = self._get_paid_map(year, month)
+        return self._generate_virtual_expenses(rules, paid_map, year, month)
 
+    def _get_recurring_rules(self, year: int, month: int):
         first_day = datetime.date(year, month, 1)
-
-        recurring_rules = RecurringExpense.objects.filter(
+        last_day = datetime.date(year, month, calendar.monthrange(year, month)[1])
+        return RecurringExpense.objects.filter(
             user=self.user,
             active=True,
-            start_date__lte=datetime.date(year, month, calendar.monthrange(year, month)[1]),
+            start_date__lte=last_day,
         ).filter(Q(end_date__gte=first_day) | Q(end_date__isnull=True))
 
-        paid_map = {
+    def _get_paid_map(self, year: int, month: int):
+        return {
             (p.recurring_expense_id, p.month, p.year): True
             for p in PaidRecurringExpense.objects.filter(
                 user=self.user, month=month, year=year
             )
         }
 
+    def _generate_virtual_expenses(self, rules, paid_map, year, month):
         virtual_expenses = []
-        for rule in recurring_rules:
+        for rule in rules:
             due_date = FinancesValidations.safe_due_date(year, month, rule.due_day)
-
             is_paid = paid_map.get((rule.id, month, year), False)
-
-            virtual_expense = Expense(
-                id=rule.id * -1,
-                user=self.user,
-                name=rule.name,
-                amount=rule.amount,
-                due_date=due_date,
-                category=rule.category,
-                paid=is_paid,
+            virtual_expenses.append(
+                Expense(
+                    id=rule.id * -1,
+                    user=self.user,
+                    name=rule.name,
+                    amount=rule.amount,
+                    due_date=due_date,
+                    category=rule.category,
+                    paid=is_paid,
+                )
             )
-            virtual_expenses.append(virtual_expense)
-
         return virtual_expenses
