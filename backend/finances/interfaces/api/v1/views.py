@@ -32,6 +32,26 @@ class ExpenseViewSet(
         month = self.request.query_params.get('month')
         return FinancesValidations.validate_month_year(year=year, month=month)
 
+    def list(self, request, *args, **kwargs):
+        year, month = self._get_year_month()
+
+        service = ExpenseListService(request.user)
+        concrete = Expense.objects.filter(
+            user=request.user,
+            due_date__year=year,
+            due_date__month=month,
+        )
+
+        virtual = service.get_virtual_expenses(year, month)
+        all_expenses = sorted(
+            list(concrete) + virtual,
+            key=lambda e: e.due_date
+        )
+
+        page = self.paginate_queryset(all_expenses)
+        serializer = self.get_serializer(page or all_expenses, many=True)
+        return self.get_paginated_response(serializer.data) if page else Response(serializer.data)
+
     def get_serializer_class(self):
         if self.action == 'create':
             return serializers.ExpenseCreateSerializer
