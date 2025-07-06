@@ -1,21 +1,15 @@
-from rest_framework import viewsets, permissions, mixins, serializers, status
+from rest_framework import viewsets, permissions, mixins, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
+from . import serializers
 from finances.services import create_installment_expense
 from finances.services.category_service import CategoryService
 from finances.services.expense_list_service import ExpenseListService
 from finances.services.expense_payment_service import ExpensePaymentService
 from finances.models import PaidRecurringExpense, Expense, InstallmentExpense
-from .serializers import (
-    CategorySerializer,
-    ExpenseSerializer,
-    ExpenseCreateSerializer,
-    InstallmentExpenseCreateSerializer,
-    RecurringExpenseSerializer,
-    PaidRecurringExpenseSerializer,
-)
+from finances.utils.validations import FinancesValidations
 
 
 class ExpenseViewSet(
@@ -24,7 +18,7 @@ class ExpenseViewSet(
     mixins.UpdateModelMixin,
     viewsets.ReadOnlyModelViewSet,
 ):
-    serializer_class = ExpenseSerializer
+    serializer_class = serializers.ExpenseSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
@@ -34,24 +28,14 @@ class ExpenseViewSet(
         return Expense.objects.filter(user=self.request.user)
 
     def _get_year_month(self):
-        year_str = self.request.query_params.get('year')
-        month_str = self.request.query_params.get('month')
-
-        if not year_str or not month_str:
-            raise ValidationError({'error': 'Os campos mês e ano são obrigatórios.'})
-        
-        try:
-            year = int(year_str)
-            month = int(month_str)
-        except (ValueError, TypeError):
-            raise ValidationError({'error': 'Ano e mês devem ser números inteiros.'})
-        
-        return year, month
+        year = self.request.query_params.get('year')
+        month = self.request.query_params.get('month')
+        return FinancesValidations.validate_month_year(year=year, month=month)
 
     def get_serializer_class(self):
         if self.action == 'create':
-            return ExpenseCreateSerializer
-        return ExpenseSerializer
+            return serializers.ExpenseCreateSerializer
+        return serializers.ExpenseSerializer
 
     def perform_create(self, serializer):
         category_id = serializer.validated_data.pop('category_id', None)
@@ -93,7 +77,7 @@ class ExpenseViewSet(
 
 
 class CategoryViewSet(viewsets.ModelViewSet):
-    serializer_class = CategorySerializer
+    serializer_class = serializers.CategorySerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
@@ -109,7 +93,7 @@ class InstallmentExpenseViewSet(
     mixins.UpdateModelMixin,
     mixins.DestroyModelMixin,
 ):
-    serializer_class = InstallmentExpenseCreateSerializer
+    serializer_class = serializers.InstallmentExpenseCreateSerializer
     permission_classes = [permissions.IsAuthenticated]
     queryset = InstallmentExpense.objects.all()
 
@@ -122,7 +106,7 @@ class InstallmentExpenseViewSet(
                 user=self.request.user, **serializer.validated_data
             )
         except ValueError as e:
-            raise serializers.ValidationError(str(e))
+            raise ValidationError(str(e))
 
     def perform_destroy(self, instance):
         instance.expenses.all().delete()
@@ -130,7 +114,7 @@ class InstallmentExpenseViewSet(
 
 
 class RecurringExpenseViewSet(viewsets.ModelViewSet):
-    serializer_class = RecurringExpenseSerializer
+    serializer_class = serializers.RecurringExpenseSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
@@ -147,7 +131,7 @@ class RecurringExpenseViewSet(viewsets.ModelViewSet):
         year = request.data.get('year')
 
         if not all([month, year]):
-            return Response({'detail': 'Dados incompletos'}, status=400)
+            return Response({'detail': 'Dados incompletos'}, status=status.HTTP_400_BAD_REQUEST)
 
         recurring = self.get_object()
 
@@ -158,5 +142,5 @@ class RecurringExpenseViewSet(viewsets.ModelViewSet):
             year=year,
         )
 
-        serializer = PaidRecurringExpenseSerializer(obj)
+        serializer = serializers.PaidRecurringExpenseSerializer(obj)
         return Response(serializer.data, status=201 if created else 200)
