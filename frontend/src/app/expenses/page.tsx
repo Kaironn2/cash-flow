@@ -7,6 +7,15 @@ import { useAuth } from '@/context/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { ExpenseModal } from '@/components/expenses/ExpenseModal';
 
+// Import dos componentes Select do shadcn
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectValue,
+  SelectItem,
+} from '@/components/ui/select';
+
 export default function ExpensesPage() {
   const { accessToken } = useAuth();
   const [expenses, setExpenses] = useState<any[]>([]);
@@ -88,51 +97,55 @@ export default function ExpensesPage() {
   };
 
   const years = Array.from(new Set(availableMonths.map((m) => m.year))).sort(
-    (a, b) => b - a,
+    (a, b) => a - b,
   );
 
-  function onYearChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const year = parseInt(e.target.value);
-    setSelectedYear(year);
-    const monthsOfYear = availableMonths
-      .filter((m) => m.year === year)
-      .map((m) => m.month);
-    if (monthsOfYear.length > 0) setSelectedMonth(monthsOfYear[0]);
-  }
-
-  function onMonthChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    setSelectedMonth(parseInt(e.target.value));
-  }
+  const monthsOfSelectedYear = availableMonths
+    .filter((m) => m.year === selectedYear)
+    .sort((a, b) => a.month - b.month);
 
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <div className="flex gap-4">
-          <select
-            value={selectedMonth}
-            onChange={onMonthChange}
-            className="p-2 rounded bg-[#2a2a2a] text-white"
+          <Select
+            value={selectedMonth.toString()}
+            onValueChange={(value) => setSelectedMonth(parseInt(value))}
           >
-            {availableMonths
-              .filter((m) => m.year === selectedYear)
-              .map((m) => (
-                <option key={m.month} value={m.month}>
+            <SelectTrigger className="w-[100px]">
+              <SelectValue placeholder="Mês" />
+            </SelectTrigger>
+            <SelectContent>
+              {monthsOfSelectedYear.map((m) => (
+                <SelectItem key={m.month} value={m.month.toString()}>
                   {monthNames[m.month - 1]}
-                </option>
+                </SelectItem>
               ))}
-          </select>
+            </SelectContent>
+          </Select>
 
-          <select
-            value={selectedYear}
-            onChange={onYearChange}
-            className="p-2 rounded bg-[#2a2a2a] text-white"
+          <Select
+            value={selectedYear.toString()}
+            onValueChange={(value) => {
+              const year = parseInt(value);
+              setSelectedYear(year);
+              const months = availableMonths
+                .filter((m) => m.year === year)
+                .map((m) => m.month);
+              if (months.length > 0) setSelectedMonth(months[0]);
+            }}
           >
-            {years.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="w-[80px]">
+              <SelectValue placeholder="Ano" />
+            </SelectTrigger>
+            <SelectContent>
+              {years.map((y) => (
+                <SelectItem key={y} value={y.toString()}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <button
