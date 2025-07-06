@@ -3,14 +3,18 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from finances.application.use_cases import create_installment_expense, list_expenses_by_month
-from finances.models import Category
+from finances.application.use_cases import (
+    create_installment_expense,
+    list_expenses_by_month,
+)
+from finances.models import Category, PaidRecurringExpense
 from .serializers import (
     CategorySerializer,
     ExpenseSerializer,
     ExpenseCreateSerializer,
     InstallmentExpenseCreateSerializer,
     RecurringExpenseSerializer,
+    PaidRecurringExpenseSerializer,
 )
 
 
@@ -29,24 +33,20 @@ class ExpenseViewSet(
         month_str = self.request.query_params.get('month')
 
         if not year_str or not month_str:
-            raise ValidationError({
-                'error': 'The "year" and "month" parameters are mandatory.'
-            })
+            raise ValidationError(
+                {'error': 'The "year" and "month" parameters are mandatory.'}
+            )
 
         try:
             year = int(year_str)
             month = int(month_str)
         except (ValueError, TypeError):
-            raise ValidationError({
-                'error': 'The "year" and "month" parameters must be integers.'
-            })
-        
-        queryset = list_expenses_by_month.execute(
-            user=user,
-            year=year,
-            month=month
-        )
-        
+            raise ValidationError(
+                {'error': 'The "year" and "month" parameters must be integers.'}
+            )
+
+        queryset = list_expenses_by_month.execute(user=user, year=year, month=month)
+
         return queryset
 
     def get_serializer_class(self):
@@ -70,7 +70,7 @@ class ExpenseViewSet(
     @action(detail=True, methods=['post'])
     def pay(self, request, pk=None):
         expense = self.get_object()
-        
+
         if not expense.paid:
             expense.paid = True
             expense.save(update_fields=['paid'])
@@ -101,12 +101,10 @@ class InstallmentExpenseViewSet(
     def perform_create(self, serializer):
         try:
             create_installment_expense.execute(
-                user=self.request.user, 
-                **serializer.validated_data
+                user=self.request.user, **serializer.validated_data
             )
         except ValueError as e:
             raise serializers.ValidationError(str(e))
-
 
 class RecurringExpenseViewSet(viewsets.ModelViewSet):
     serializer_class = RecurringExpenseSerializer
@@ -122,6 +120,28 @@ class RecurringExpenseViewSet(viewsets.ModelViewSet):
             try:
                 category = Category.objects.get(id=category_id, user=self.request.user)
             except Category.DoesNotExist:
-                raise serializers.ValidationError({'category_id': 'Category not found.'})
-        
+                raise serializers.ValidationError(
+                    {'category_id': 'Category not found.'}
+                )
+
         serializer.save(user=self.request.user, category=category)
+
+    @action(detail=True, methods=['post'])
+    def mark_paid(self, request, pk=None):
+        month = request.data.get('month')
+        year = request.data.get('year')
+
+        if not all([month, year]):
+            return Response({'detail': 'Dados incompletos'}, status=400)
+
+        recurring = self.get_object()
+
+        obj, created = PaidRecurringExpense.objects.get_or_create(
+            user=request.user,
+            recurring_expense=recurring,
+            month=month,
+            year=year,
+        )
+
+        serializer = PaidRecurringExpenseSerializer(obj)
+        return Response(serializer.data, status=201 if created else 200)

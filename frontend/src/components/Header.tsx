@@ -7,7 +7,7 @@ export default function Header() {
 
   return (
     <header className="flex items-center justify-between p-4 border-b border-gray-800 bg-[#1a1a1a]">
-      <h1 className="text-xl font-semibold text-white">Dashboard</h1>
+      <h1 className="text-xl font-semibold text-white">DESPESAS</h1>
       <div className="flex items-center gap-4">
         <Button onClick={logout} className="bg-yellow-500 text-black hover:bg-yellow-400">
           Sair

@@ -13,3 +13,6 @@ dependencies = [
     "python-dateutil>=2.9.0.post0",
     "python-decouple>=3.8",
 ]
+
+[tool.ruff.format]
+quote-style = 'single'

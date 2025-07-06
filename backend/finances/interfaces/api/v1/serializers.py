@@ -1,6 +1,12 @@
 from rest_framework import serializers
 
-from finances.models import Category, Expense, InstallmentExpense, RecurringExpense
+from finances.models import (
+    Category,
+    Expense,
+    InstallmentExpense,
+    PaidRecurringExpense,
+    RecurringExpense
+)
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -11,7 +17,7 @@ class CategorySerializer(serializers.ModelSerializer):
 
 class ExpenseSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
-    
+
     class Meta:
         model = Expense
         fields = [
@@ -33,13 +39,13 @@ class ExpenseSerializer(serializers.ModelSerializer):
             ret['is_recurring'] = False
 
         ret['is_installment'] = instance.installment_origin_id is not None
-            
+
         return ret
 
 
 class InstallmentExpenseCreateSerializer(serializers.ModelSerializer):
     category_id = serializers.IntegerField(write_only=True)
-    
+
     class Meta:
         model = InstallmentExpense
         fields = [
@@ -47,7 +53,7 @@ class InstallmentExpenseCreateSerializer(serializers.ModelSerializer):
             'total_amount',
             'installments_quantity',
             'first_due_date',
-            'category_id'
+            'category_id',
         ]
 
 
@@ -83,3 +89,34 @@ class RecurringExpenseSerializer(serializers.ModelSerializer):
             'category_id',
         ]
         read_only_fields = ['id', 'active']
+
+
+class PaidRecurringExpenseSerializer(serializers.ModelSerializer):
+    date = serializers.DateField(write_only=True)
+
+    class Meta:
+        model = PaidRecurringExpense
+        fields = [
+            'id',
+            'recurring_expense',
+            'date',
+            'day',
+            'month',
+            'year',
+            'created_at',
+        ]
+        read_only_fields = ['day', 'month', 'year', 'created_at']
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        recurring_expense = validated_data['recurring_expense']
+        date = validated_data['date']
+
+        obj, created = PaidRecurringExpense.objects.get_or_create(
+            user=user,
+            recurring_expense=recurring_expense,
+            month=date.month,
+            year=date.year,
+            defaults={'day': date.day}
+        )
+        return obj

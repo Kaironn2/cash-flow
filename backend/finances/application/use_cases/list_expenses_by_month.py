@@ -1,7 +1,7 @@
 import datetime
 from django.db.models import Q
 from django.contrib.auth.models import User
-from finances.models import Expense, RecurringExpense
+from finances.models import Expense, RecurringExpense, PaidRecurringExpense
 
 
 def execute(user: User, year: int, month: int):
@@ -21,13 +21,24 @@ def execute(user: User, year: int, month: int):
         Q(end_date__gte=first_day_of_month) | Q(end_date__isnull=True)
     )
 
+    paid_map = {
+        (p.recurring_expense_id, p.month, p.year): True
+        for p in PaidRecurringExpense.objects.filter(
+            user=user,
+            month=month,
+            year=year
+        )
+    }
+
     virtual_expenses = []
     for rule in recurring_rules:
         try:
             due_date_for_month = datetime.date(year, month, rule.due_day)
         except ValueError:
             continue
-        
+
+        is_paid = paid_map.get((rule.id, month, year), False)
+
         virtual_expense = Expense(
             id=rule.id * -1, 
             user=user,
@@ -35,7 +46,7 @@ def execute(user: User, year: int, month: int):
             amount=rule.amount,
             due_date=due_date_for_month,
             category=rule.category,
-            paid=False
+            paid=is_paid,
         )
         virtual_expenses.append(virtual_expense)
 

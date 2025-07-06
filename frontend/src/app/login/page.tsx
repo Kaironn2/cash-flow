@@ -13,7 +13,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      router.push('/')
+      router.push('/expenses')
     }
   }, [isAuthenticated, isLoading, router])
 
