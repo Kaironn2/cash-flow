@@ -25,6 +25,17 @@ class ExpenseListService:
         virtual = self._generate_virtual_expenses(rules, paid_map, year, month)
         return sorted(concrete + virtual, key=lambda e: e.due_date)
 
+    def all_for_month(self, year: int, month: int) -> List[Expense]:
+        concrete = list(
+            Expense.objects.filter(
+                user=self.user,
+                due_date__year=year,
+                due_date__month=month,
+            )
+        )
+        virtual = self.get_virtual_expenses(year, month)
+        return sorted(concrete + virtual, key=lambda e: e.due_date)
+
     def available_months(self) -> List[Dict[str, int]]:
         concrete = (
             Expense.objects.filter(user=self.user)
