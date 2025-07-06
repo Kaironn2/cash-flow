@@ -1,14 +1,12 @@
-from django.db.models.functions import ExtractMonth, ExtractYear
-from rest_framework import viewsets, permissions, mixins, serializers
+from rest_framework import viewsets, permissions, mixins, serializers, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from finances.application.use_cases import (
-    create_installment_expense,
-    list_expenses_by_month,
-)
-from finances.models import Category, PaidRecurringExpense, Expense
+from finances.services import create_installment_expense
+from finances.services.expense_list_service import ExpenseListService
+from finances.services.expense_payment_service import ExpensePaymentService
+from finances.models import Category, PaidRecurringExpense, Expense, InstallmentExpense
 from .serializers import (
     CategorySerializer,
     ExpenseSerializer,
@@ -29,26 +27,25 @@ class ExpenseViewSet(
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        user = self.request.user
+        if self.action == 'list':
+            year, month = self._get_year_month()
+            return ExpenseListService(self.request.user).for_month(year, month)
+        return Expense.objects.filter(user=self.request.user)
+
+    def _get_year_month(self):
         year_str = self.request.query_params.get('year')
         month_str = self.request.query_params.get('month')
 
         if not year_str or not month_str:
-            raise ValidationError(
-                {'error': 'The "year" and "month" parameters are mandatory.'}
-            )
-
+            raise ValidationError({'error': 'Os campos mês e ano são obrigatórios.'})
+        
         try:
             year = int(year_str)
             month = int(month_str)
         except (ValueError, TypeError):
-            raise ValidationError(
-                {'error': 'The "year" and "month" parameters must be integers.'}
-            )
-
-        queryset = list_expenses_by_month.execute(user=user, year=year, month=month)
-
-        return queryset
+            raise ValidationError({'error': 'Ano e mês devem ser números inteiros.'})
+        
+        return year, month
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -68,33 +65,38 @@ class ExpenseViewSet(
 
         serializer.save(user=self.request.user, category=category)
 
-    @action(detail=True, methods=['post'])
-    def pay(self, request, pk=None):
-        expense = self.get_object()
+    @action(detail=False, methods=['post'], url_path='mark-paid')
+    def mark_paid(self, request, *args, **kwargs):
+        try:
+            service = ExpensePaymentService(
+                user=request.user,
+                items=request.data.get('ids', []),
+                month=request.data.get('month'),
+                year=request.data.get('year'),
+            )
+            service.mark()
+            return Response({'status': 'marked as paid.'})
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not expense.paid:
-            expense.paid = True
-            expense.save(update_fields=['paid'])
-
-        return Response(self.get_serializer(expense).data)
+    @action(detail=False, methods=['post'], url_path='unmark-paid')
+    def unmark_paid(self, request, *args, **kwargs):
+        try:
+            service = ExpensePaymentService(
+                user=request.user,
+                items=request.data.get('ids', []),
+                month=request.data.get('month'),
+                year=request.data.get('year'),
+            )
+            service.unmark()
+            return Response({'status': 'unmarked as paid.'})
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=False, methods=['get'], url_path='months')
     def get_months(self, request, *args, **kwargs):
-        user = request.user
-
-        concrete = Expense.objects.filter(user=user).annotate(
-            m=ExtractMonth('due_date'),
-            y=ExtractYear('due_date')
-        ).values('m', 'y')
-
-        recurring = PaidRecurringExpense.objects.filter(user=user).values('month', 'year')
-
-        combined = list({(item['m'], item['y']) for item in concrete} |
-                        {(item['month'], item['year']) for item in recurring})
-
-        combined.sort(key=lambda x: (x[1], x[0]), reverse=True)
-
-        return Response([{'month': m, 'year': y} for m, y in combined])
+        months = ExpenseListService(request.user).available_months()
+        return Response(months)
 
 
 class CategoryViewSet(viewsets.ModelViewSet):
@@ -116,6 +118,10 @@ class InstallmentExpenseViewSet(
 ):
     serializer_class = InstallmentExpenseCreateSerializer
     permission_classes = [permissions.IsAuthenticated]
+    queryset = InstallmentExpense.objects.all()
+
+    def get_queryset(self):
+        return self.queryset.filter(user=self.request.user)
 
     def perform_create(self, serializer):
         try:
@@ -124,6 +130,10 @@ class InstallmentExpenseViewSet(
             )
         except ValueError as e:
             raise serializers.ValidationError(str(e))
+
+    def perform_destroy(self, instance):
+        instance.expenses.all().delete()
+        instance.delete()
 
 
 class RecurringExpenseViewSet(viewsets.ModelViewSet):
