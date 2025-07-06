@@ -1,6 +1,7 @@
 from django.utils.timezone import localtime
 from rest_framework import serializers
 
+from .mixins import UserCategoryCreateMixin
 from finances.models import (
     Category,
     Expense,
@@ -19,7 +20,7 @@ class CategorySerializer(serializers.ModelSerializer):
         validated_data['user'] = self.context['request'].user
         return super().create(validated_data)
 
-class ExpenseSerializer(serializers.ModelSerializer):
+class ExpenseSerializer(serializers.ModelSerializer, UserCategoryCreateMixin):
     category = CategorySerializer(read_only=True)
     installment_origin = serializers.PrimaryKeyRelatedField(read_only=True)
 
@@ -37,19 +38,6 @@ class ExpenseSerializer(serializers.ModelSerializer):
 
     def get_due_date(self, obj):
         return localtime(obj.due_date).date().isoformat()
-    
-    def create(self, validated_data):
-        user = self.context['request'].user
-        category_id = validated_data.pop('category_id', None)
-        category = None
-
-        if category_id:
-            try:
-                category = Category.objects.get(id=category_id, user=user)
-            except Category.DoesNotExist:
-                raise serializers.ValidationError({'category_id': 'Categoria não encontrada.'})
-
-        return Expense.objects.create(user=user, category=category, **validated_data)
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
@@ -108,7 +96,7 @@ class ExpenseCreateSerializer(serializers.ModelSerializer):
 
 
 
-class RecurringExpenseSerializer(serializers.ModelSerializer):
+class RecurringExpenseSerializer(serializers.ModelSerializer, UserCategoryCreateMixin):
     category_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
 
     class Meta:
@@ -124,19 +112,6 @@ class RecurringExpenseSerializer(serializers.ModelSerializer):
             'category_id',
         ]
         read_only_fields = ['id', 'active']
-
-    def create(self, validated_data):
-        user = self.context['request'].user
-        category_id = validated_data.pop('category_id', None)
-        category = None
-
-        if category_id is not None:
-            try:
-                category = Category.objects.get(id=category_id, user=user)
-            except Category.DoesNotExist:
-                raise serializers.ValidationError({'category_id': 'Categoria não encontrada.'})
-
-        return RecurringExpense.objects.create(user=user, category=category, **validated_data)
 
 
 class PaidRecurringExpenseSerializer(serializers.ModelSerializer):

@@ -1,6 +1,8 @@
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status, serializers
+
+from finances.models import Category
 
 
 class BaseUserQuerysetMixin:
@@ -29,3 +31,21 @@ class MarkPaidActionMixin:
     @action(detail=False, methods=['post'], url_path='unmark-paid')
     def unmark_paid(self, request, *args, **kwargs):
         return self._toggle_payment(request, mark=False)
+
+
+class UserCategoryCreateMixin:
+    def create(self, validated_data):
+        user = self.context['request'].user
+        category_id = validated_data.pop('category_id', None)
+        category = None
+
+        if category_id is not None:
+            try:
+                category = Category.objects.get(id=category_id, user=user)
+            except Category.DoesNotExist:
+                raise serializers.ValidationError({'category_id': 'Categoria não encontrada.'})
+
+        validated_data['user'] = user
+        validated_data['category'] = category
+
+        return super().create(validated_data)
