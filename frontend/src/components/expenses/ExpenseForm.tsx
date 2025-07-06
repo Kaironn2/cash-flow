@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { endpoints, authHeader } from '@/lib/api';
-
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -15,6 +14,7 @@ import {
   SelectItem,
 } from '@/components/ui/select';
 import { DatePicker } from '@/components/ui/date-picker';
+import { CategoryCombobox } from '../ui/CategoryComboBox';
 
 type ExpenseType = 'unique' | 'installment' | 'recurring';
 
@@ -117,22 +117,13 @@ export function ExpenseForm({ onSubmit, accessToken }: ExpenseFormProps) {
 
         <div className="w-3/5 min-w-[240px]">
           <Label className="mb-2 block">Categoria</Label>
-          <Select
-            value={categoryId.toString()}
-            onValueChange={(value) => setCategoryId(Number(value))}
-          >
-            <SelectTrigger className="min-w-[240px]">
-              <SelectValue placeholder="Selecione a categoria" />
-            </SelectTrigger>
-            <SelectContent>
-              {categories.map((cat) => (
-                <SelectItem key={cat.id} value={cat.id.toString()}>
-                  {cat.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <CategoryCombobox
+            value={categoryId}
+            onChange={setCategoryId}
+            accessToken={accessToken as string}
+          />
         </div>
+
       </div>
 
       <div>
