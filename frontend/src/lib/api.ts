@@ -8,6 +8,8 @@ export const endpoints = {
     recurring: `${API_URL}/finances/recurring-expenses/`,
     installments: `${API_URL}/finances/installment-expenses/`,
     expenseMonths: `${API_URL}/finances/expenses/months/`,
+    markPaid: `${API_URL}/finances/expenses/mark-paid/`,
+    unmarkPaid: `${API_URL}/finances/expenses/unmark-paid/`,
 };
 
 export const authHeader = (token: string) => ({
