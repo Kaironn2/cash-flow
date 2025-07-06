@@ -1,3 +1,4 @@
+from django.utils.timezone import localtime
 from rest_framework import serializers
 
 from finances.models import (
@@ -30,6 +31,9 @@ class ExpenseSerializer(serializers.ModelSerializer):
             'category',
             'installment_origin',
         ]
+
+    def get_due_date(self, obj):
+        return localtime(obj.due_date).date().isoformat()
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
