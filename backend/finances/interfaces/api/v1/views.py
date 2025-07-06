@@ -4,7 +4,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from . import serializers
-from finances.services import create_installment_expense
+from finances.services.installment_expense_service import InstallmentExpenseService
 from finances.services.category_service import CategoryService
 from finances.services.expense_list_service import ExpenseListService
 from finances.services.expense_payment_service import ExpensePaymentService
@@ -122,9 +122,15 @@ class InstallmentExpenseViewSet(
 
     def perform_create(self, serializer):
         try:
-            create_installment_expense.execute(
-                user=self.request.user, **serializer.validated_data
+            service = InstallmentExpenseService(
+                user=self.request.user,
+                name=serializer.validated_data['name'],
+                total_amount=serializer.validated_data['total_amount'],
+                installments_quantity=serializer.validated_data['installments_quantity'],
+                first_due_date=serializer.validated_data['first_due_date'],
+                category_id=serializer.validated_data['category_id'],
             )
+            service.create_installment_expense()
         except ValueError as e:
             raise ValidationError(str(e))
 
