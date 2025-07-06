@@ -17,6 +17,7 @@ class CategorySerializer(serializers.ModelSerializer):
 
 class ExpenseSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
+    installment_origin = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = Expense
