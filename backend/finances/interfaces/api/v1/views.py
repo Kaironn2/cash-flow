@@ -1,3 +1,4 @@
+from django.db.models.functions import ExtractMonth, ExtractYear
 from rest_framework import viewsets, permissions, mixins, serializers
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -7,7 +8,7 @@ from finances.application.use_cases import (
     create_installment_expense,
     list_expenses_by_month,
 )
-from finances.models import Category, PaidRecurringExpense
+from finances.models import Category, PaidRecurringExpense, Expense
 from .serializers import (
     CategorySerializer,
     ExpenseSerializer,
@@ -77,6 +78,24 @@ class ExpenseViewSet(
 
         return Response(self.get_serializer(expense).data)
 
+    @action(detail=False, methods=['get'], url_path='months')
+    def get_months(self, request, *args, **kwargs):
+        user = request.user
+
+        concrete = Expense.objects.filter(user=user).annotate(
+            m=ExtractMonth('due_date'),
+            y=ExtractYear('due_date')
+        ).values('m', 'y')
+
+        recurring = PaidRecurringExpense.objects.filter(user=user).values('month', 'year')
+
+        combined = list({(item['m'], item['y']) for item in concrete} |
+                        {(item['month'], item['year']) for item in recurring})
+
+        combined.sort(key=lambda x: (x[1], x[0]), reverse=True)
+
+        return Response([{'month': m, 'year': y} for m, y in combined])
+
 
 class CategoryViewSet(viewsets.ModelViewSet):
     serializer_class = CategorySerializer
@@ -105,6 +124,7 @@ class InstallmentExpenseViewSet(
             )
         except ValueError as e:
             raise serializers.ValidationError(str(e))
+
 
 class RecurringExpenseViewSet(viewsets.ModelViewSet):
     serializer_class = RecurringExpenseSerializer
