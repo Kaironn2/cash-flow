@@ -8,7 +8,7 @@ from .mixins import BaseUserQuerysetMixin, MarkPaidActionMixin
 from finances.services.installment_expense_service import InstallmentExpenseService
 from finances.services.expense_list_service import ExpenseListService
 from finances.services.expense_payment_service import ExpensePaymentService
-from finances.models import Category, PaidRecurringExpense, InstallmentExpense, RecurringExpense
+from finances.models import Category, Expense, PaidRecurringExpense, InstallmentExpense, RecurringExpense
 from finances.utils.validations import FinancesValidations
 
 
@@ -20,6 +20,7 @@ class ExpenseViewSet(
     BaseUserQuerysetMixin,
     MarkPaidActionMixin
 ):
+    queryset = Expense.objects.all()
     serializer_class = serializers.ExpenseSerializer
     permission_classes = [permissions.IsAuthenticated]
     payment_service_class = ExpensePaymentService
