@@ -67,7 +67,13 @@ export function DeleteModal({ isOpen, onClose, onConfirm, selectedCount }: Props
               <Button variant="secondary" onClick={onClose}>
                 Cancelar
               </Button>
-              <Button className="bg-red-600 text-white hover:bg-red-500" onClick={onConfirm}>
+              <Button
+                className="bg-red-600 text-white hover:bg-red-500"
+                onClick={() => {
+                  onConfirm();
+                  onClose();
+                }}
+              >
                 Excluir
               </Button>
             </div>
