@@ -4,17 +4,13 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { endpoints, authHeader } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
-import { Badge } from '@/components/ui/badge';
+import { ExpenseFilters } from '@/components/expenses/ExpenseFilters';
 import { ExpenseModal } from '@/components/expenses/ExpenseModal';
-
-// Import dos componentes Select do shadcn
-import {
-  Select,
-  SelectTrigger,
-  SelectContent,
-  SelectValue,
-  SelectItem,
-} from '@/components/ui/select';
+import { ExpenseCard } from '@/components/expenses/ExpenseCard';
+import { ExpenseActionsBar } from '@/components/expenses/ExpenseActionsBar';
+import { SelectAllCheckbox } from '@/components/expenses/SelectAllCheckbox';
+import { DeleteModal } from '@/components/expenses/DeleteModal';
+import { Button } from '@/components/ui/button';
 
 export default function ExpensesPage() {
   const { accessToken } = useAuth();
@@ -23,53 +19,61 @@ export default function ExpensesPage() {
     { month: number; year: number }[]
   >([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const today = new Date();
-
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
 
   const monthNames = [
-    'Jan',
-    'Fev',
-    'Mar',
-    'Abr',
-    'Mai',
-    'Jun',
-    'Jul',
-    'Ago',
-    'Set',
-    'Out',
-    'Nov',
-    'Dez',
+    'Janeiro',
+    'Fevereiro',
+    'Março',
+    'Abril',
+    'Maio',
+    'Junho',
+    'Julho',
+    'Agosto',
+    'Setembro',
+    'Outubro',
+    'Novembro',
+    'Dezembro',
   ];
 
+  const reloadExpenses = () => {
+    axios
+      .get(`${endpoints.expenses}?year=${selectedYear}&month=${selectedMonth}`, {
+        headers: authHeader(accessToken as string),
+      })
+      .then((res) => setExpenses(res.data))
+      .catch(console.error);
+  };
+
   useEffect(() => {
+    type MonthYear = { month: number; year: number };
     if (!accessToken) return;
 
     axios
-      .get(endpoints.expenseMonths, {
-        headers: authHeader(accessToken),
-      })
+      .get(endpoints.expenseMonths, { headers: authHeader(accessToken) })
       .then((res) => {
-        setAvailableMonths(res.data);
-        if (res.data.length > 0) {
-          setSelectedYear(res.data[0].year);
-          setSelectedMonth(res.data[0].month);
+        const sorted = res.data.sort((a: MonthYear, b: MonthYear) => {
+          if (a.year !== b.year) return a.year - b.year;
+          return a.month - b.month;
+        });
+        setAvailableMonths(sorted);
+        if (sorted.length > 0) {
+          setSelectedYear(sorted[0].year);
+          setSelectedMonth(sorted[0].month);
         }
       })
-      .catch((err) => console.error(err));
+      .catch(console.error);
   }, [accessToken]);
 
   useEffect(() => {
     if (!accessToken) return;
-
-    axios
-      .get(`${endpoints.expenses}?year=${selectedYear}&month=${selectedMonth}`, {
-        headers: authHeader(accessToken),
-      })
-      .then((res) => setExpenses(res.data))
-      .catch((err) => console.error(err));
+    reloadExpenses();
   }, [accessToken, selectedYear, selectedMonth]);
 
   const handleCreateExpense = async (data: any) => {
@@ -79,116 +83,174 @@ export default function ExpensesPage() {
     if (data.type === 'installment') url = endpoints.installments;
     else if (data.type === 'recurring') url = endpoints.recurring;
 
-    try {
-      await axios.post(url, data, {
-        headers: authHeader(accessToken),
-      });
-
-      const res = await axios.get(
-        `${endpoints.expenses}?year=${selectedYear}&month=${selectedMonth}`,
-        {
-          headers: authHeader(accessToken),
-        },
-      );
-      setExpenses(res.data);
-    } catch (err) {
-      console.error('Erro ao criar despesa:', err);
-    }
+    await axios.post(url, data, { headers: authHeader(accessToken) });
+    reloadExpenses();
   };
 
-  const years = Array.from(new Set(availableMonths.map((m) => m.year))).sort(
-    (a, b) => a - b,
-  );
+  const years = Array.from(new Set(availableMonths.map((m) => m.year)));
+  const monthsOfSelectedYear = availableMonths.filter((m) => m.year === selectedYear);
 
-  const monthsOfSelectedYear = availableMonths
-    .filter((m) => m.year === selectedYear)
-    .sort((a, b) => a.month - b.month);
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
+    );
+  };
+
+  const selectAll = () => {
+    const allIds = expenses.map((e) => {
+      const prefix = e.is_recurring ? 'r' : e.is_installment ? 'i' : 'e';
+      return `${prefix}-${e.id}`;
+    });
+    setSelectedIds((prev) => (prev.length === allIds.length ? [] : allIds));
+  };
+
+  const handleMarkPaid = async () => {
+    const ids = selectedIds.map((id) => {
+      const [type, rawId] = id.split('-');
+      return { type, id: Number(rawId) };
+    });
+
+    await axios.post(
+      endpoints.markPaid,
+      { ids, month: selectedMonth, year: selectedYear },
+      { headers: authHeader(accessToken as string) },
+    );
+
+    reloadExpenses();
+    setSelectedIds([]);
+  };
+
+  const handleUnmarkPaid = async () => {
+    const ids = selectedIds.map((id) => {
+      const [type, rawId] = id.split('-');
+      return { type, id: Number(rawId) };
+    });
+
+    await axios.post(
+      endpoints.unmarkPaid,
+      { ids, month: selectedMonth, year: selectedYear },
+      { headers: authHeader(accessToken as string) },
+    );
+
+    reloadExpenses();
+    setSelectedIds([]);
+  };
+
+  const handleDelete = async () => {
+    if (!accessToken) return;
+
+    const concreteIds: number[] = [];
+    const installmentIds: number[] = [];
+    const recurringIds: number[] = [];
+
+    selectedIds.forEach((id) => {
+      const [type, rawId] = id.split('-');
+      const numId = Number(rawId);
+      if (type === 'e') concreteIds.push(numId);
+      else if (type === 'r') recurringIds.push(numId);
+      else if (type === 'i') {
+        const expense = expenses.find((e) => e.id === numId);
+        if (expense && expense.installment_origin) {
+          if (typeof expense.installment_origin === 'number') {
+            installmentIds.push(expense.installment_origin);
+          } else if (
+            typeof expense.installment_origin === 'object' &&
+            expense.installment_origin.id
+          ) {
+            installmentIds.push(expense.installment_origin.id);
+          }
+        }
+      }
+    });
+
+    try {
+      if (concreteIds.length > 0) {
+        await Promise.all(
+          concreteIds.map((id) =>
+            axios.delete(`${endpoints.expenses}${id}/`, {
+              headers: authHeader(accessToken),
+            }),
+          ),
+        );
+      }
+      if (installmentIds.length > 0) {
+        await Promise.all(
+          installmentIds.map((id) =>
+            axios.delete(`${endpoints.installments}${id}/`, {
+              headers: authHeader(accessToken),
+            }),
+          ),
+        );
+      }
+      if (recurringIds.length > 0) {
+        await Promise.all(
+          recurringIds.map((id) =>
+            axios.delete(`${endpoints.recurring}${id}/`, {
+              headers: authHeader(accessToken),
+            }),
+          ),
+        );
+      }
+
+      setSelectedIds([]);
+      reloadExpenses();
+      setIsDeleteModalOpen(false);
+    } catch (error) {
+      console.error('Erro ao deletar despesas:', error);
+    }
+  };
 
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <div className="flex gap-4">
-          <Select
-            value={selectedMonth.toString()}
-            onValueChange={(value) => setSelectedMonth(parseInt(value))}
-          >
-            <SelectTrigger className="w-[100px]">
-              <SelectValue placeholder="Mês" />
-            </SelectTrigger>
-            <SelectContent>
-              {monthsOfSelectedYear.map((m) => (
-                <SelectItem key={m.month} value={m.month.toString()}>
-                  {monthNames[m.month - 1]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <ExpenseFilters
+          selectedMonth={selectedMonth}
+          selectedYear={selectedYear}
+          availableMonths={availableMonths}
+          onMonthChange={(m) => setSelectedMonth(m)}
+          onYearChange={(y) => {
+            setSelectedYear(y);
+            const months = availableMonths
+              .filter((m) => m.year === y)
+              .map((m) => m.month);
+            if (months.length > 0) setSelectedMonth(months[0]);
+          }}
+        />
 
-          <Select
-            value={selectedYear.toString()}
-            onValueChange={(value) => {
-              const year = parseInt(value);
-              setSelectedYear(year);
-              const months = availableMonths
-                .filter((m) => m.year === year)
-                .map((m) => m.month);
-              if (months.length > 0) setSelectedMonth(months[0]);
-            }}
-          >
-            <SelectTrigger className="w-[80px]">
-              <SelectValue placeholder="Ano" />
-            </SelectTrigger>
-            <SelectContent>
-              {years.map((y) => (
-                <SelectItem key={y} value={y.toString()}>
-                  {y}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <button
+        <Button
           onClick={() => setIsModalOpen(true)}
-          className="bg-yellow-500 text-gray-900 font-semibold px-4 py-2 rounded hover:bg-yellow-400"
+          className="bg-yellow-500 text-gray-900 hover:bg-yellow-400"
         >
           + Nova Despesa
-        </button>
+        </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {expenses.map((exp) => (
-          <div key={exp.id} className="bg-[#1e1e1e] p-4 rounded-xl">
-            <div className="flex justify-between items-start">
-              <span className="font-medium">{exp.name}</span>
-              <div className="flex flex-col items-end">
-                <div className="flex items-center gap-2">
-                  {exp.is_installment && (
-                    <Badge className="bg-blue-800 text-blue-300">
-                      Parcelada {exp.name.match(/\((\d+\/\d+)\)/)?.[1] || ''}
-                    </Badge>
-                  )}
-                  {exp.is_recurring && (
-                    <Badge className="bg-purple-800 text-purple-300">
-                      Recorrente Ativa
-                    </Badge>
-                  )}
-                  <span className="text-yellow-400 font-medium">
-                    {Number(exp.amount).toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                    })}
-                  </span>
-                </div>
-              </div>
-            </div>
+      {selectedIds.length > 0 && (
+        <ExpenseActionsBar
+          onMarkPaid={handleMarkPaid}
+          onUnmarkPaid={handleUnmarkPaid}
+          onDeleteClick={() => setIsDeleteModalOpen(true)}
+        />
+      )}
 
-            <div className="text-sm text-gray-400 mt-2">
-              Vencimento: {new Date(exp.due_date).toLocaleDateString('pt-BR')} <br />
-              Categoria: {exp.category?.name || '-'}
-            </div>
-          </div>
-        ))}
+      <SelectAllCheckbox
+        checked={selectedIds.length === expenses.length && expenses.length > 0}
+        onChange={selectAll}
+      />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {expenses.map((exp) => {
+          const prefix = exp.is_recurring ? 'r' : exp.is_installment ? 'i' : 'e';
+          const id = `${prefix}-${exp.id}`;
+          return (
+            <ExpenseCard
+              key={id}
+              expense={exp}
+              checked={selectedIds.includes(id)}
+              onToggle={() => toggleSelect(id)}
+            />
+          );
+        })}
       </div>
 
       <ExpenseModal
@@ -196,6 +258,13 @@ export default function ExpensesPage() {
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleCreateExpense}
         accessToken={accessToken}
+      />
+
+      <DeleteModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleDelete}
+        selectedCount={selectedIds.length}
       />
     </div>
   );
