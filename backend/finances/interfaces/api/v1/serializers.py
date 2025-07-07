@@ -23,6 +23,7 @@ class CategorySerializer(serializers.ModelSerializer):
 class ExpenseSerializer(serializers.ModelSerializer, UserCategoryCreateMixin):
     category = CategorySerializer(read_only=True)
     installment_origin = serializers.PrimaryKeyRelatedField(read_only=True)
+    category_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
 
     class Meta:
         model = Expense
@@ -33,6 +34,7 @@ class ExpenseSerializer(serializers.ModelSerializer, UserCategoryCreateMixin):
             'due_date',
             'paid',
             'category',
+            'category_id',
             'installment_origin',
         ]
 
@@ -50,6 +52,23 @@ class ExpenseSerializer(serializers.ModelSerializer, UserCategoryCreateMixin):
         ret['is_installment'] = instance.installment_origin_id is not None
 
         return ret
+
+    def update(self, instance, validated_data):
+        user = self.context['request'].user
+
+        category_id = validated_data.pop('category_id', None)
+        if category_id is not None:
+            try:
+                category = Category.objects.get(id=category_id, user=user)
+                instance.category = category
+            except Category.DoesNotExist:
+                raise serializers.ValidationError({'category_id': 'Categoria não encontrada.'})
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        instance.save()
+        return instance
 
 
 class InstallmentExpenseCreateSerializer(serializers.ModelSerializer):
