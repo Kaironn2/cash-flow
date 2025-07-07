@@ -36,6 +36,7 @@ export function DeleteModal({ isOpen, onClose, onConfirm, selectedCount }: Props
       {isOpen && (
         <motion.div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+          data-testid="modal-backdrop"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -43,6 +44,7 @@ export function DeleteModal({ isOpen, onClose, onConfirm, selectedCount }: Props
         >
           <motion.div
             ref={modalRef}
+            data-testid="modal-content"
             className="bg-[#1e1e1e] text-white rounded-xl w-full max-w-sm p-6 shadow-lg relative"
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
