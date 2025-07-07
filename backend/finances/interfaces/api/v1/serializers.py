@@ -96,7 +96,7 @@ class ExpenseCreateSerializer(serializers.ModelSerializer):
 
 
 
-class RecurringExpenseSerializer(serializers.ModelSerializer, UserCategoryCreateMixin):
+class RecurringExpenseSerializer(serializers.ModelSerializer):
     category_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
 
     class Meta:
@@ -112,6 +112,22 @@ class RecurringExpenseSerializer(serializers.ModelSerializer, UserCategoryCreate
             'category_id',
         ]
         read_only_fields = ['id', 'active']
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        category_id = validated_data.pop('category_id', None)
+        category = None
+
+        if category_id is not None:
+            try:
+                category = Category.objects.get(id=category_id, user=user)
+            except Category.DoesNotExist:
+                raise serializers.ValidationError({'category_id': 'Categoria não encontrada.'})
+
+        validated_data['user'] = user
+        validated_data['category'] = category
+
+        return RecurringExpense.objects.create(**validated_data)
 
 
 class PaidRecurringExpenseSerializer(serializers.ModelSerializer):

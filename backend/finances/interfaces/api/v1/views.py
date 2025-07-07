@@ -7,7 +7,8 @@ from . import serializers
 from .mixins import BaseUserQuerysetMixin, MarkPaidActionMixin
 from finances.services.installment_expense_service import InstallmentExpenseService
 from finances.services.expense_list_service import ExpenseListService
-from finances.models import Category, PaidRecurringExpense, InstallmentExpense
+from finances.services.expense_payment_service import ExpensePaymentService
+from finances.models import Category, PaidRecurringExpense, InstallmentExpense, RecurringExpense
 from finances.utils.validations import FinancesValidations
 
 
@@ -21,6 +22,7 @@ class ExpenseViewSet(
 ):
     serializer_class = serializers.ExpenseSerializer
     permission_classes = [permissions.IsAuthenticated]
+    payment_service_class = ExpensePaymentService
 
     def _get_year_month(self):
         year = self.request.query_params.get('year')
@@ -46,10 +48,12 @@ class ExpenseViewSet(
         return Response(months)
 
 
-class CategoryViewSet(viewsets.ModelViewSet, BaseUserQuerysetMixin):
+class CategoryViewSet(viewsets.ModelViewSet):
     serializer_class = serializers.CategorySerializer
     permission_classes = [permissions.IsAuthenticated]
-    queryset = Category.objects.all()
+
+    def get_queryset(self):
+        return Category.objects.filter(user=self.request.user)
 
 
 class InstallmentExpenseViewSet(
@@ -81,6 +85,7 @@ class InstallmentExpenseViewSet(
 class RecurringExpenseViewSet(viewsets.ModelViewSet, BaseUserQuerysetMixin):
     serializer_class = serializers.RecurringExpenseSerializer
     permission_classes = [permissions.IsAuthenticated]
+    queryset = RecurringExpense.objects.all()
 
     @action(detail=True, methods=['post'])
     def mark_paid(self, request, pk=None):
