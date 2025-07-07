@@ -2,6 +2,7 @@
 
 import { useAuth } from '@/context/AuthContext';
 import { useState } from 'react';
+import { useEffect } from 'react';
 import { ExpenseFilters } from '@/components/expenses/ExpenseFilters';
 import { ExpenseModal } from '@/components/expenses/ExpenseModal';
 import { ExpenseCard } from '@/components/expenses/ExpenseCard';
@@ -17,7 +18,8 @@ import { useExpensesActions } from '@/hooks/useExpensesActions';
 export default function ExpensesPage() {
   const { accessToken } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
-const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<any | null>(null);
 
   const {
     expenses,
@@ -39,6 +41,7 @@ const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const {
     handleCreateExpense,
+    handleUpdateExpense,
     handleMarkPaid,
     handleUnmarkPaid,
     handleDelete,
@@ -52,6 +55,18 @@ const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     clearSelection: () => setSelectedIds([]),
   });
 
+  useEffect(() => {
+    const onExpenseClick = (e: CustomEvent) => {
+      setEditingExpense(e.detail);
+      setIsModalOpen(true);
+    };
+    window.addEventListener('expense:click', onExpenseClick as EventListener);
+
+    return () => {
+      window.removeEventListener('expense:click', onExpenseClick as EventListener);
+    };
+  }, []);
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
@@ -62,7 +77,9 @@ const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
           onMonthChange={setSelectedMonth}
           onYearChange={(y) => {
             setSelectedYear(y);
-            const months = availableMonths.filter((m) => m.year === y).map((m) => m.month);
+            const months = availableMonths
+              .filter((m) => m.year === y)
+              .map((m) => m.month);
             if (months.length > 0) setSelectedMonth(months[0]);
           }}
         />
@@ -105,9 +122,21 @@ const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
       <ExpenseModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleCreateExpense}
+        disableTypeSelect={!!editingExpense}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingExpense(null);
+        }}
+        onSubmit={(data) => {
+          if (editingExpense) {
+            handleUpdateExpense(editingExpense.id, data, data.type);
+          } else {
+            handleCreateExpense(data);
+          }
+        }}
         accessToken={accessToken}
+        defaultValues={editingExpense}
+        title={editingExpense ? 'Editar Despesa' : 'Nova Despesa'}
       />
 
       <DeleteModal

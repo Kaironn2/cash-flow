@@ -21,6 +21,8 @@ type ExpenseType = 'unique' | 'installment' | 'recurring';
 interface ExpenseFormProps {
   onSubmit: (data: any) => void;
   accessToken: string | null;
+  defaultValues?: any;
+  disableTypeSelect?: boolean;
 }
 
 interface Category {
@@ -28,7 +30,12 @@ interface Category {
   name: string;
 }
 
-export function ExpenseForm({ onSubmit, accessToken }: ExpenseFormProps) {
+export function ExpenseForm({
+  onSubmit,
+  accessToken,
+  defaultValues,
+  disableTypeSelect,
+}: ExpenseFormProps) {
   const [type, setType] = useState<ExpenseType>('unique');
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryId, setCategoryId] = useState<number | ''>('');
@@ -53,6 +60,58 @@ export function ExpenseForm({ onSubmit, accessToken }: ExpenseFormProps) {
     }
     fetchCategories();
   }, [accessToken]);
+
+  useEffect(() => {
+    if (!defaultValues) {
+      setType('unique');
+      setCategoryId('');
+      setName('');
+      setAmount('');
+      setDueDate(undefined);
+      setInstallments('');
+      setStartDate(undefined);
+      setEndDate(undefined);
+      return;
+    }
+
+    const t: ExpenseType = defaultValues.is_installment
+      ? 'installment'
+      : defaultValues.is_recurring
+      ? 'recurring'
+      : 'unique';
+
+    setType(t);
+    setCategoryId(defaultValues.category?.id || '');
+    setName(defaultValues.name || '');
+
+    if (t === 'unique') {
+      setAmount(defaultValues.amount?.toString() || '');
+      setDueDate(defaultValues.due_date ? new Date(defaultValues.due_date) : undefined);
+      setInstallments('');
+      setStartDate(undefined);
+      setEndDate(undefined);
+    } else if (t === 'installment') {
+      setAmount(defaultValues.total_amount?.toString() || '');
+      setDueDate(
+        defaultValues.first_due_date
+          ? new Date(defaultValues.first_due_date)
+          : undefined,
+      );
+      setInstallments(defaultValues.installments_quantity?.toString() || '');
+      setStartDate(undefined);
+      setEndDate(undefined);
+    } else if (t === 'recurring') {
+      setAmount(defaultValues.amount?.toString() || '');
+      setDueDate(
+        defaultValues.start_date ? new Date(defaultValues.start_date) : undefined,
+      );
+      setStartDate(
+        defaultValues.start_date ? new Date(defaultValues.start_date) : undefined,
+      );
+      setEndDate(defaultValues.end_date ? new Date(defaultValues.end_date) : undefined);
+      setInstallments('');
+    }
+  }, [defaultValues]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,7 +162,15 @@ export function ExpenseForm({ onSubmit, accessToken }: ExpenseFormProps) {
       <div className="flex gap-4">
         <div className="w-2/5 min-w-[180px]">
           <Label className="mb-2 block">Tipo</Label>
-          <Select value={type} onValueChange={(value) => setType(value as ExpenseType)}>
+          <Select
+            value={type}
+            onValueChange={(value) => {
+              if (!disableTypeSelect) {
+                setType(value as ExpenseType);
+              }
+            }}
+            disabled={disableTypeSelect}
+          >
             <SelectTrigger className="min-w-[180px]">
               <SelectValue placeholder="Selecione o tipo" />
             </SelectTrigger>
@@ -123,7 +190,6 @@ export function ExpenseForm({ onSubmit, accessToken }: ExpenseFormProps) {
             accessToken={accessToken as string}
           />
         </div>
-
       </div>
 
       <div>

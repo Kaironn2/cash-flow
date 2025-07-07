@@ -9,6 +9,9 @@ interface ExpenseModalProps {
   onClose: () => void;
   onSubmit: (data: any) => void;
   accessToken: string | null;
+  defaultValues?: any | null;
+  title?: string;
+  disableTypeSelect?: boolean;
 }
 
 export function ExpenseModal({
@@ -16,6 +19,9 @@ export function ExpenseModal({
   onClose,
   onSubmit,
   accessToken,
+  defaultValues = null,
+  title,
+  disableTypeSelect,
 }: ExpenseModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -62,10 +68,12 @@ export function ExpenseModal({
               x
             </button>
 
-            <h2 className="text-2xl font-semibold mb-4">Nova Despesa</h2>
+            <h2 className="text-2xl font-semibold mb-4">{title || 'Nova Despesa'}</h2>
 
             <ExpenseForm
               accessToken={accessToken}
+              defaultValues={defaultValues}
+              disableTypeSelect={disableTypeSelect}
               onSubmit={(data) => {
                 onSubmit(data);
                 onClose();

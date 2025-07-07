@@ -37,8 +37,18 @@ export function ExpenseCard({ expense, checked, onToggle }: Props) {
     return new Date(date.getTime() + date.getTimezoneOffset() * 60000);
   };
 
+  const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('button, input, label')) return; // ignora se clicou no checkbox
+    const customEvent = new CustomEvent('expense:click', { detail: expense });
+    window.dispatchEvent(customEvent);
+  };
+
   return (
-    <div key={id} className="bg-[#1e1e1e] p-4 rounded-xl">
+    <div
+      key={id}
+      className="bg-[#1e1e1e] p-4 rounded-xl cursor-pointer"
+      onClick={handleCardClick}
+    >
       <div className="flex justify-between items-start">
         <span className="font-medium">{expense.name}</span>
         <Checkbox checked={checked} onCheckedChange={onToggle} />
@@ -52,7 +62,9 @@ export function ExpenseCard({ expense, checked, onToggle }: Props) {
               currency: 'BRL',
             })}
           </span>
-          <span>Vencimento: {getLocalDate(expense.due_date).toLocaleDateString('pt-BR')}</span>
+          <span>
+            Vencimento: {getLocalDate(expense.due_date).toLocaleDateString('pt-BR')}
+          </span>
           <span>Categoria: {expense.category?.name || '-'}</span>
         </div>
 

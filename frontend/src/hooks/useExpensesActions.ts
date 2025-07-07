@@ -31,6 +31,22 @@ export function useExpensesActions({
     reloadExpenses();
   };
 
+  const handleUpdateExpense = async (id: number, data: any, type: string) => {
+    if (!accessToken) return;
+
+    let url = '';
+    if (type === 'installment') url = `${endpoints.installments}${id}/`;
+    else if (type === 'recurring') url = `${endpoints.recurring}${id}/`;
+    else url = `${endpoints.expenses}${id}/`;
+
+    try {
+      await axios.put(url, data, { headers: authHeader(accessToken) });
+      reloadExpenses();
+    } catch (error) {
+      console.error('Erro ao atualizar despesa:', error);
+    }
+  };
+
   const handleMarkPaid = async () => {
     if (!accessToken) return;
 
@@ -134,6 +150,7 @@ export function useExpensesActions({
 
   return {
     handleCreateExpense,
+    handleUpdateExpense,
     handleMarkPaid,
     handleUnmarkPaid,
     handleDelete,
