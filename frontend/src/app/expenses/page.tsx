@@ -36,7 +36,6 @@ export default function ExpensesPage() {
     setSelectedIds,
     toggleSelect,
     selectAll,
-    getSelectedIdsFormatted,
   } = useExpensesSelection(expenses);
 
   const {
