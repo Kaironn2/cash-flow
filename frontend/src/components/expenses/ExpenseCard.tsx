@@ -38,7 +38,7 @@ export function ExpenseCard({ expense, checked, onToggle }: Props) {
   };
 
   const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if ((e.target as HTMLElement).closest('button, input, label')) return; // ignora se clicou no checkbox
+    if ((e.target as HTMLElement).closest('button, input, label')) return;
     const customEvent = new CustomEvent('expense:click', { detail: expense });
     window.dispatchEvent(customEvent);
   };
@@ -46,7 +46,13 @@ export function ExpenseCard({ expense, checked, onToggle }: Props) {
   return (
     <div
       key={id}
-      className="bg-[#1e1e1e] p-4 rounded-xl cursor-pointer"
+            className={clsx(
+        'bg-[#1e1e1e] p-4 rounded-xl cursor-pointer',
+        'border-2 border-transparent',
+        'transition-colors duration-300',
+        'hover:border-yellow-400',
+        'hover:scale-105 transition-transform'
+      )}
       onClick={handleCardClick}
     >
       <div className="flex justify-between items-start">
