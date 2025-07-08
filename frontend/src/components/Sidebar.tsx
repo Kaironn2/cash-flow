@@ -1,4 +1,5 @@
 'use client';
+
 import {
   Home,
   Wallet,
@@ -6,6 +7,7 @@ import {
   Settings,
   HelpCircle,
   User,
+  CircleDollarSign,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -20,8 +22,12 @@ const items = [
 
 export default function Sidebar() {
   return (
-    <aside className="w-64 min-h-screen bg-[#101010] text-white flex flex-col py-6 px-4 border-r border-gray-800">
-      <div className="text-xl font-bold text-yellow-500 mb-10">Cash Flow</div>
+    <aside className="w-64 min-h-screen bg-[#101010] text-white flex flex-col py-6 px-4 border-r">
+      <div className="flex items-center gap-2 text-xl font-bold text-yellow-500 mb-10 border-b pb-6">
+        <CircleDollarSign size={24} />
+        <span>CASH FLOW</span>
+      </div>
+
       <nav className="space-y-2 flex-1">
         {items.map(({ icon, label, href }) => (
           <Link
@@ -34,9 +40,6 @@ export default function Sidebar() {
           </Link>
         ))}
       </nav>
-      <div className="mt-auto border-t border-gray-800 pt-4 text-sm text-gray-400">
-        <p>© 2025 Cash Flow</p>
-      </div>
     </aside>
   );
 }
